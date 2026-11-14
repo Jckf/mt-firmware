@@ -1,0 +1,14 @@
+[
+  {
+    "branch": "jckf/powerlimit",
+    "suffix": "jpl",
+    "description": "EU_868, EU_866 and EU_N_868 power limit raised from 27 to 30 dBm",
+    "targets": [
+      { "platform": "esp32s3", "pio_env": "t-beam-1w" },
+      { "platform": "nrf52840", "pio_env": "rak3401-1watt" },
+      { "platform": "nrf52840", "pio_env": "rak_wismesh_repeater_mini_hp" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4-tft" }
+    ]
+  }
+]

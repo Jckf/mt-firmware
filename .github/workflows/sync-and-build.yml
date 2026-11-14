@@ -1,0 +1,134 @@
+name: Sync and build
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  push:
+    branches: [jckf/main]
+    paths: [builds.json]
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: string
+        required: false
+        description: Only this patch branch (blank for all in builds.json)
+      force_build:
+        type: boolean
+        default: false
+        description: Build even if upstream has not moved
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  UPSTREAM_REPO: meshtastic/firmware
+  UPSTREAM_BRANCH: develop
+  MIRROR_BRANCH: develop
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      builds: ${{ steps.sync.outputs.builds }}
+      failed: ${{ steps.sync.outputs.failed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ci
+
+      - uses: actions/checkout@v7
+        with:
+          path: fw
+          ref: ${{ env.MIRROR_BRANCH }}
+          fetch-depth: 0
+          # Fine-grained PAT, this repo only, Contents + Workflows read/write. GITHUB_TOKEN cannot push
+          # branches whose history touches .github/workflows/, which every upstream rebase does.
+          token: ${{ secrets.SYNC_PAT }}
+
+      - id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ONLY_BRANCH: ${{ inputs.branch }}
+          # A builds.json change means new targets or branches, so build everything.
+          FORCE_BUILD: ${{ inputs.force_build || github.event_name == 'push' }}
+        run: ci/scripts/sync.sh ci/builds.json fw
+
+      - name: Fail on branches that did not rebase
+        if: steps.sync.outputs.failed != '[]'
+        env:
+          FAILED: ${{ steps.sync.outputs.failed }}
+        run: |
+          echo "Did not rebase cleanly: $FAILED"
+          exit 1
+
+  build:
+    needs: sync
+    if: ${{ !cancelled() && needs.sync.outputs.builds != '' && needs.sync.outputs.builds != '[]' }}
+    name: ${{ matrix.branch }} ${{ matrix.pio_env }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.sync.outputs.builds) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.sha }}
+          submodules: recursive
+
+      - id: version
+        env:
+          SUFFIX: ${{ matrix.suffix }}
+          BUILD_LOCATION: local
+        run: echo "long=$(./bin/buildinfo.py long)-$SUFFIX" >> "$GITHUB_OUTPUT"
+
+      - uses: meshtastic/gh-action-firmware@main
+        with:
+          pio_platform: ${{ matrix.platform }}
+          pio_env: ${{ matrix.pio_env }}
+          pio_target: build
+
+      # ESP32 steps below follow upstream's build_firmware.yml so the release folder flashes the same way.
+      - name: ESP32 - Download unified OTA firmware
+        if: matrix.platform == 'esp32' || matrix.platform == 'esp32s3'
+        working-directory: release
+        env:
+          PIO_PLATFORM: ${{ matrix.platform }}
+        run: curl -fL -o "mt-$PIO_PLATFORM-ota.bin" "https://github.com/meshtastic/esp32-unified-ota/releases/latest/download/mt-$PIO_PLATFORM-ota.bin"
+
+      - name: ESP32-C* - Download BLE-only OTA firmware
+        if: matrix.platform == 'esp32c3' || matrix.platform == 'esp32c6'
+        working-directory: release
+        run: curl -fL -o bleota-c3.bin https://github.com/meshtastic/firmware-ota/releases/latest/download/firmware-c3.bin
+
+      - name: Add OTA file to manifest
+        if: startsWith(matrix.platform, 'esp32')
+        working-directory: release
+        env:
+          PIO_PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [[ "$PIO_PLATFORM" == esp32 || "$PIO_PLATFORM" == esp32s3 ]]; then OTA_FILE="mt-$PIO_PLATFORM-ota.bin"; else OTA_FILE=bleota-c3.bin; fi
+          [[ -f "$OTA_FILE" ]] || exit 0
+          OTA_MD5=$(md5sum "$OTA_FILE" | cut -d' ' -f1)
+          OTA_SIZE=$(stat -c%s "$OTA_FILE")
+          for manifest in firmware-*.mt.json; do
+            [[ -f "$manifest" ]] || continue
+            jq --arg name "$OTA_FILE" --arg md5 "$OTA_MD5" --argjson bytes "$OTA_SIZE" --arg part app1 \
+              'if .files | map(select(.name == $name)) | length == 0 then .files += [{"name": $name, "md5": $md5, "bytes": $bytes, "part_name": $part}] else . end' \
+              "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware-${{ matrix.pio_env }}-${{ steps.version.outputs.long }}
+          overwrite: true
+          path: |
+            release/*.mt.json
+            release/*.bin
+            release/*.elf
+            release/*.uf2
+            release/*.hex
+            release/*.zip
+            release/device-*.sh
+            release/device-*.bat
