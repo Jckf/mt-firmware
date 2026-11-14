@@ -3,7 +3,8 @@
 #
 # Rebases every patch branch in builds.json onto upstream and force-pushes the ones that moved.
 # The fork's own develop is never pushed: that would start upstream's full CI matrix in the fork. Writes to $GITHUB_OUTPUT:
-#   builds - matrix entries {branch, suffix, sha, platform, pio_env} for branches to build
+#   builds   - matrix entries {branch, suffix, sha, platform, pio_env} for branches to build
+#   releases - one entry per branch to build {branch, suffix, description, sha, short, upstream, count}
 #   failed - patch branches that no longer rebase cleanly
 #
 # Env: UPSTREAM_REPO, UPSTREAM_BRANCH, ONLY_BRANCH (optional), FORCE_BUILD (true/false), GH_TOKEN
@@ -20,7 +21,9 @@ git fetch --no-tags upstream "$UPSTREAM_BRANCH"
 base=upstream/$UPSTREAM_BRANCH
 
 builds='[]'
+releases='[]'
 failed='[]'
+upstream_sha=$(git rev-parse "$base")
 
 while read -r entry <&3; do
   branch=$(jq -r .branch <<<"$entry")
@@ -55,10 +58,15 @@ while read -r entry <&3; do
 
   if [[ "$ok" == true && ("$changed" == true || "${FORCE_BUILD:-false}" == true) ]]; then
     sha=$(git rev-parse HEAD)
+    # Same abbreviation as bin/readprops.py, so the release job can find the artifacts by version.
+    short=$(git rev-parse --short=7 HEAD)
     builds=$(jq -c --argjson e "$entry" --arg sha "$sha" \
       '. + [$e.targets[] | {branch: $e.branch, suffix: $e.suffix, sha: $sha, platform, pio_env}]' <<<"$builds")
+    releases=$(jq -c --argjson e "$entry" --arg sha "$sha" --arg short "$short" --arg up "$upstream_sha" \
+      '. + [{branch: $e.branch, suffix: $e.suffix, description: ($e.description // ""), sha: $sha, short: $short, upstream: $up, count: ($e.targets | length)}]' <<<"$releases")
   fi
 done 3< <(jq -c '.[]' "$config")
 
 echo "builds=$builds" >>"$GITHUB_OUTPUT"
+echo "releases=$releases" >>"$GITHUB_OUTPUT"
 echo "failed=$failed" >>"$GITHUB_OUTPUT"

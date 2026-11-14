@@ -30,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       builds: ${{ steps.sync.outputs.builds }}
+      releases: ${{ steps.sync.outputs.releases }}
       failed: ${{ steps.sync.outputs.failed }}
     steps:
       - uses: actions/checkout@v7
@@ -131,3 +132,90 @@ jobs:
             release/*.zip
             release/device-*.sh
             release/device-*.bat
+
+  # One rolling release per patch branch, tag <suffix>-latest, with stable asset names so the
+  # download links never change. Published only when every target of the branch built.
+  release:
+    needs: [sync, build]
+    if: ${{ !cancelled() && needs.sync.outputs.releases != '' && needs.sync.outputs.releases != '[]' }}
+    name: release ${{ matrix.branch }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.sync.outputs.releases) }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: firmware-*.${{ matrix.short }}-${{ matrix.suffix }}
+          path: dist
+
+      - name: Package and publish
+        env:
+          BRANCH: ${{ matrix.branch }}
+          SUFFIX: ${{ matrix.suffix }}
+          DESCRIPTION: ${{ matrix.description }}
+          SHA: ${{ matrix.sha }}
+          SHORT: ${{ matrix.short }}
+          UPSTREAM: ${{ matrix.upstream }}
+          COUNT: ${{ matrix.count }}
+          GITHUB_TOKEN: ${{ github.token }}
+          # Moving the tag onto a commit whose history touches .github/workflows/ needs the PAT.
+          # The release itself uses GITHUB_TOKEN, so it does not trigger upstream's release workflows.
+          SYNC_PAT: ${{ secrets.SYNC_PAT }}
+        run: |
+          set -euo pipefail
+          TAG="$SUFFIX-latest"
+          REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          mkdir -p dist out
+          shopt -s nullglob
+
+          dirs=(dist/firmware-*)
+          if (( ${#dirs[@]} != COUNT )); then
+            echo "::error::$BRANCH: $COUNT targets, ${#dirs[@]} built. Not publishing a partial release."
+            exit 1
+          fi
+
+          rows=""
+          for d in "${dirs[@]}"; do
+            name=${d#dist/}
+            [[ $name =~ ^firmware-(.+)-([0-9]+\.[0-9]+\.[0-9]+\.$SHORT-$SUFFIX)$ ]] || { echo "::error::unexpected artifact $name"; exit 1; }
+            pio_env=${BASH_REMATCH[1]}
+            version=${BASH_REMATCH[2]}
+            zip_name="firmware-$pio_env-$SUFFIX.zip"
+            (cd "$d" && zip -qr "../../out/$zip_name" .)
+            rows+="| \`$pio_env\` | [$zip_name]($REPO_URL/releases/download/$TAG/$zip_name) |"$'\n'
+          done
+
+          {
+            echo "**$version**, built from [\`$SHORT\`]($REPO_URL/commit/$SHA) on [\`$BRANCH\`]($REPO_URL/tree/$BRANCH), on top of upstream [\`${UPSTREAM:0:7}\`](https://github.com/meshtastic/firmware/commit/$UPSTREAM)."
+            echo
+            [[ -n "$DESCRIPTION" ]] && { echo "$DESCRIPTION"; echo; }
+            echo "| Board | Download |"
+            echo "| --- | --- |"
+            printf '%s' "$rows"
+            echo
+            echo "Built $(date -u '+%Y-%m-%d %H:%M UTC'). Every new build replaces this release; the links stay the same."
+          } > notes.md
+
+          if GH_TOKEN=$SYNC_PAT gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            GH_TOKEN=$SYNC_PAT gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$SHA" -F force=true >/dev/null
+          else
+            GH_TOKEN=$SYNC_PAT gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$SHA" >/dev/null
+          fi
+
+          export GH_TOKEN=$GITHUB_TOKEN
+          title="$BRANCH (latest)"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --title "$title" --notes-file notes.md
+            gh release upload "$TAG" -R "$GITHUB_REPOSITORY" out/*.zip --clobber
+            # Drop boards that were removed from builds.json.
+            gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | while read -r asset; do
+              [[ -f "out/$asset" ]] || gh release delete-asset "$TAG" "$asset" -R "$GITHUB_REPOSITORY" -y
+            done
+          else
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag --latest=false --title "$title" --notes-file notes.md out/*.zip
+          fi
+          echo "Published $REPO_URL/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

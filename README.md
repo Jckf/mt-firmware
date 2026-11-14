@@ -24,7 +24,13 @@ EU short-range-device limits are specified as ERP (27 dBm). The firmware applies
 
 ## Downloads
 
-Open the latest successful [Sync and build](../../actions/workflows/sync-and-build.yml) run and download `firmware-<board>-<version>-<suffix>` from its artifacts. Flash it like any other Meshtastic release. The firmware reports the upstream version with the patch branch's commit hash, e.g. `2.8.3.26ec75c`.
+Each patch set has a release that every new build replaces. The links below never change:
+
+| Branch | Release |
+| --- | --- |
+| `jckf/powerlimit` | [jpl-latest](../../releases/tag/jpl-latest) |
+
+Direct links per board follow the pattern `https://github.com/Jckf/mt-firmware/releases/download/<suffix>-latest/firmware-<pio_env>-<suffix>.zip`, e.g. [firmware-t-beam-1w-jpl.zip](https://github.com/Jckf/mt-firmware/releases/download/jpl-latest/firmware-t-beam-1w-jpl.zip). Flash it like any other Meshtastic release. The firmware reports the upstream version with the patch branch's commit hash, e.g. `2.8.3.949efa6`, and `firmware_edition` `DIY_EDITION`.
 
 ## Branches
 
@@ -42,7 +48,7 @@ Open the latest successful [Sync and build](../../actions/workflows/sync-and-bui
    git fetch upstream develop && git switch -c jckf/<name> upstream/develop
    ```
 2. Add an entry to `builds.json`: branch, version suffix, description and `{platform, pio_env}` targets.
-3. Push `builds.json`. That triggers a full build; after that the branch is rebased and rebuilt whenever upstream moves.
+3. Push `builds.json`. That triggers a full build and creates the `<suffix>-latest` release; after that the branch is rebased and rebuilt whenever upstream moves.
 
 After pushing new commits to a patch branch, run [Sync and build](../../actions/workflows/sync-and-build.yml) by hand with that branch and *Build even if upstream has not moved* ticked. The nightly run only builds branches that upstream moved.
 
