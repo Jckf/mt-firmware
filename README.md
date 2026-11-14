@@ -31,12 +31,16 @@ Open the latest successful [Sync and build](../../actions/workflows/sync-and-bui
 | Branch | Contents |
 | --- | --- |
 | `jckf/main` | This README, `builds.json` and the CI (default branch) |
-| `develop` | Unmodified mirror of upstream `develop`, overwritten nightly |
-| `jckf/<name>` | One patch set each, rebased onto `develop` nightly |
+| `develop` | Upstream's branch as of the fork, not maintained. Pushing to it starts upstream's full CI in this fork |
+| `jckf/<name>` | One patch set each, rebased onto upstream `develop` nightly |
 
 ## Adding a build
 
-1. Create `jckf/<name>` from `develop` and commit the patches.
+1. Create `jckf/<name>` from upstream `develop` and commit the patches:
+   ```sh
+   git remote add upstream https://github.com/meshtastic/firmware.git   # once
+   git fetch upstream develop && git switch -c jckf/<name> upstream/develop
+   ```
 2. Add an entry to `builds.json`: branch, version suffix, description and `{platform, pio_env}` targets.
 3. Push `builds.json`. That triggers a full build; after that the branch is rebased and rebuilt whenever upstream moves.
 

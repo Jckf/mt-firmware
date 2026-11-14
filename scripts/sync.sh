@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Usage: sync.sh <builds.json> <firmware checkout>
 #
-# Mirrors upstream into MIRROR_BRANCH, rebases every patch branch in builds.json onto it and
-# force-pushes the ones that moved. Writes to $GITHUB_OUTPUT:
+# Rebases every patch branch in builds.json onto upstream and force-pushes the ones that moved.
+# The fork's own develop is never pushed: that would start upstream's full CI matrix in the fork. Writes to $GITHUB_OUTPUT:
 #   builds - matrix entries {branch, suffix, sha, platform, pio_env} for branches to build
 #   failed - patch branches that no longer rebase cleanly
 #
-# Env: UPSTREAM_REPO, UPSTREAM_BRANCH, MIRROR_BRANCH, ONLY_BRANCH (optional), FORCE_BUILD (true/false), GH_TOKEN
+# Env: UPSTREAM_REPO, UPSTREAM_BRANCH, ONLY_BRANCH (optional), FORCE_BUILD (true/false), GH_TOKEN
 set -euo pipefail
 
 config=$(realpath "$1")
@@ -18,9 +18,6 @@ git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git remote add upstream "${UPSTREAM_URL:-https://github.com/${UPSTREAM_REPO}.git}"
 git fetch --no-tags upstream "$UPSTREAM_BRANCH"
 base=upstream/$UPSTREAM_BRANCH
-
-# The mirror is never committed to, so overwrite it rather than refuse a non-fast-forward.
-git push --force origin "$base:refs/heads/$MIRROR_BRANCH"
 
 builds='[]'
 failed='[]'

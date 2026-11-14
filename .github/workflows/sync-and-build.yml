@@ -24,7 +24,6 @@ permissions:
 env:
   UPSTREAM_REPO: meshtastic/firmware
   UPSTREAM_BRANCH: develop
-  MIRROR_BRANCH: develop
 
 jobs:
   sync:
@@ -40,10 +39,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: fw
-          ref: ${{ env.MIRROR_BRANCH }}
           fetch-depth: 0
           # Fine-grained PAT, this repo only, Contents + Workflows read/write. GITHUB_TOKEN cannot push
           # branches whose history touches .github/workflows/, which every upstream rebase does.
+          # Checks out this branch; sync.sh fetches upstream and the patch branches itself.
           token: ${{ secrets.SYNC_PAT }}
 
       - id: sync
