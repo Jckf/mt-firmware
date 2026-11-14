@@ -8,7 +8,9 @@
       { "platform": "nrf52840", "pio_env": "rak3401-1watt" },
       { "platform": "nrf52840", "pio_env": "rak_wismesh_repeater_mini_hp" },
       { "platform": "esp32s3", "pio_env": "heltec-v4" },
-      { "platform": "esp32s3", "pio_env": "heltec-v4-tft" }
+      { "platform": "esp32s3", "pio_env": "heltec-v4-tft" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4-r8-oled" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4-r8-tft" }
     ]
   }
 ]
