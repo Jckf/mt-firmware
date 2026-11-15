@@ -2,7 +2,7 @@
 
 Small patch sets on top of [meshtastic/firmware](https://github.com/meshtastic/firmware), rebased onto upstream `develop` and rebuilt automatically every night.
 
-Not supported by the Meshtastic project. Report problems here, not upstream.
+Unofficial: not made or supported by the Meshtastic project, so do not report problems with these builds upstream.
 
 ## Builds
 

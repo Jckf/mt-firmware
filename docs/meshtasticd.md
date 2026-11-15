@@ -60,4 +60,4 @@ Removes the timer, the custom binary and the diversion, puts the packaged binary
 
 - The builds are upstream `develop` plus the patch, rebuilt nightly. They are usually ahead of the packaged release, while config templates and the web UI stay at the package's version.
 - The firmware reports the upstream version with the patch commit, e.g. `2.8.3.8edc62f`, and `firmware_edition` `DIY_EDITION`.
-- Problems with these builds belong in this repository, not upstream.
+- These builds are not supported by the Meshtastic project; do not report problems with them upstream.
