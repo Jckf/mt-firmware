@@ -27,15 +27,14 @@ EU short-range-device limits are specified as ERP (27 dBm). The firmware applies
 
 A port of [meshtastic/firmware#10531](https://github.com/meshtastic/firmware/pull/10531) onto current `develop`, with `USERPREFS_MQTT_UPLINK_ALL_SEEN` turned on. Stock firmware uplinks a packet to MQTT only the first time it is heard; this build also uplinks every later copy (rebroadcasts by other relays, including of our own packets), so MQTT analytics see the SNR of every relay heard and traceroute paths that only arrive on a later copy. With MQTT encryption enabled, encrypted DMs between other nodes are uplinked once per heard copy as well.
 
-Only useful on a node with MQTT uplink enabled, and it multiplies the MQTT traffic. Built as `meshtasticd` (the `native-tft` environment, like the Debian packages) against Debian trixie, so it replaces `/usr/bin/meshtasticd` from the meshtasticd package on Debian or Raspberry Pi OS trixie:
+Only useful on a node with MQTT uplink enabled, and it multiplies the MQTT traffic. Built as `meshtasticd` (the `native-tft` environment, like the Debian packages) against Debian trixie, so it replaces `/usr/bin/meshtasticd` from the meshtasticd package on Debian or Raspberry Pi OS trixie. To install it and keep it updated:
 
 ```sh
-sudo systemctl stop meshtasticd
-sudo install -m 755 meshtasticd-arm64-jmd /usr/bin/meshtasticd
-sudo systemctl start meshtasticd
+curl -fsSLO https://raw.githubusercontent.com/Jckf/mt-firmware/refs/heads/jckf/main/scripts/meshtasticd-custom.sh
+sudo sh meshtasticd-custom.sh install jmd
 ```
 
-Upgrading or reinstalling the package puts the stock binary back.
+See [Installing a custom meshtasticd](docs/meshtasticd.md) for what that does, updates and uninstalling.
 
 ## Downloads
 
@@ -52,7 +51,7 @@ Direct links per board follow the pattern `https://github.com/Jckf/mt-firmware/r
 
 | Branch | Contents |
 | --- | --- |
-| `jckf/main` | This README, `builds.json` and the CI (default branch) |
+| `jckf/main` | This README, `builds.json`, the CI and the meshtasticd install script (default branch) |
 | `develop` | Upstream's branch as of the fork, not maintained. Pushing to it starts upstream's full CI in this fork |
 | `jckf/<name>` | One patch set each, rebased onto upstream `develop` nightly |
 
