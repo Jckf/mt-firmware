@@ -21,6 +21,11 @@ permissions:
   contents: write
   issues: write
 
+# Runs rebase the same branches and rewrite the same releases, so they must not overlap.
+concurrency:
+  group: sync-and-build
+  cancel-in-progress: false
+
 env:
   UPSTREAM_REPO: meshtastic/firmware
   UPSTREAM_BRANCH: develop

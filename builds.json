@@ -13,7 +13,8 @@
       { "platform": "esp32s3", "pio_env": "heltec-v4-r8-tft" },
       { "platform": "nrf52840", "pio_env": "heltec-mesh-node-t096" },
       { "platform": "esp32s3", "pio_env": "heltec-wireless-tracker-v2" },
-      { "platform": "nrf52840", "pio_env": "heltec-mesh-tower-v2" }
+      { "platform": "nrf52840", "pio_env": "heltec-mesh-tower-v2" },
+      { "platform": "esp32s3", "pio_env": "meshnology_w12" }
     ]
   }
 ]

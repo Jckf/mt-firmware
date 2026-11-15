@@ -8,7 +8,7 @@ Not supported by the Meshtastic project. Report problems here, not upstream.
 
 | Branch | Version suffix | Change | Boards |
 | --- | --- | --- | --- |
-| [`jckf/powerlimit`](../../tree/jckf/powerlimit) | `-jpl` | `EU_868`, `EU_866` and `EU_N_868` power limit raised from 27 to 30 dBm | T-Beam 1W, RAK3401 + RAK13302, WisMesh Repeater Mini HP, Heltec V4, V4 R8, Mesh Node T096, Wireless Tracker V2, Mesh Tower V2 |
+| [`jckf/powerlimit`](../../tree/jckf/powerlimit) | `-jpl` | `EU_868`, `EU_866` and `EU_N_868` power limit raised from 27 to 30 dBm | T-Beam 1W, RAK3401 + RAK13302, WisMesh Repeater Mini HP, Heltec V4, V4 R8, Mesh Node T096, Wireless Tracker V2, Mesh Tower V2, Meshnology W12 |
 
 ### `jckf/powerlimit`
 
@@ -18,7 +18,7 @@ EU short-range-device limits are specified as ERP (27 dBm). The firmware applies
 | --- | --- |
 | LilyGo T-Beam 1W | 30 dBm |
 | RAK3401 + RAK13302 / WisMesh Repeater Mini HP | about 29 dBm |
-| Heltec V4, V4 R8, Mesh Node T096, Wireless Tracker V2, Mesh Tower V2 | about 28 dBm |
+| Heltec V4, V4 R8, Mesh Node T096, Wireless Tracker V2, Mesh Tower V2; Meshnology W12 | about 28 dBm |
 
 **The operator is responsible for staying within the limits that apply to their installation.** Set a lower `tx_power` if your antenna gain exceeds your feedline loss plus 2.15 dB.
 
