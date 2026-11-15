@@ -1681,45 +1681,91 @@ void Router::dispatchReceived(meshtastic_MeshPacket *p, RxSource src)
             traceRouteModule->updateRoute(*p);
 #endif
         MeshModule::callModules(*p, src);
+#if !MESHTASTIC_EXCLUDE_MQTT
+        if (p_encrypted == nullptr)
+            LOG_WARN("p_encrypted null, skip MQTT publish");
+        else
+            publishReceivedToMqtt(p, decodedState, p_encrypted);
+#else
+        packetPool.release(p_encrypted);
+#endif
+    } else {
+        packetPool.release(p_encrypted); // release() handles nullptr
+    }
+}
 
 #if !MESHTASTIC_EXCLUDE_MQTT
-        if (p_encrypted == nullptr) {
-            LOG_WARN("p_encrypted null, skip MQTT publish");
-        } else {
-            // Publish received message to MQTT if we're not the original transmitter of the packet. PKI DMs we can't
-            // decrypt never get here; perhapsUplinkOpaquePki() publishes those.
-            if (decodedState == DecodeState::DECODE_SUCCESS && moduleConfig.mqtt.enabled && !isFromUs(p) && mqtt) {
-                if (decodedState == DecodeState::DECODE_SUCCESS && p->decoded.portnum == meshtastic_PortNum_TRACEROUTE_APP &&
-                    moduleConfig.mqtt.encryption_enabled) {
-                    // For TRACEROUTE_APP packets release the original encrypted packet and encrypt a new from the changed packet
-                    // Only release the original after successful allocation to avoid losing an incomplete but valid packet
-                    auto *p_encrypted_new = packetPool.allocCopy(*p);
-                    if (p_encrypted_new) {
-                        auto encodeResult = perhapsEncode(p_encrypted_new);
-                        if (encodeResult != meshtastic_Routing_Error_NONE) {
-                            // Encryption failed, release the new packet and fall back to sending the original encrypted packet to
-                            // MQTT
-                            LOG_WARN("New TR packet encrypt failed, send original TR to MQTT");
-                            packetPool.release(p_encrypted_new);
-                            p_encrypted_new = nullptr;
-                        } else {
-                            // Successfully re-encrypted, release the original encrypted packet and use the new one for MQTT
-                            packetPool.release(p_encrypted);
-                            p_encrypted = p_encrypted_new;
-                        }
-                    } else {
-                        // Allocation failed, log a warning and fall back to sending the original encrypted packet to MQTT
-                        LOG_WARN("Alloc encrypted TR packet failed, send original TR to MQTT");
-                    }
-                }
-                mqtt->onSend(*p_encrypted, *p, p->channel);
-            }
-        }
-#endif
+void Router::publishReceivedToMqtt(const meshtastic_MeshPacket *p, DecodeState decodedState, meshtastic_MeshPacket *pEncrypted)
+{
+    // dispatchReceived() passes its encrypted snapshot; the dupe-filter paths pass none and get a copy made here.
+    const bool callerProvided = (pEncrypted != nullptr);
+
+    // Packets we originated are only suppressed on the dispatchReceived() path; on the dupe-filter path
+    // (callerProvided=false) relayed copies of our own packets are uplinked on purpose.
+    if (!moduleConfig.mqtt.enabled || !mqtt || (isFromUs(p) && callerProvided)) {
+        packetPool.release(pEncrypted);
+        return;
     }
 
-    packetPool.release(p_encrypted); // Release the encrypted packet (release() handles nullptr)
+    if (pEncrypted == nullptr) {
+        DEBUG_HEAP_BEFORE;
+        pEncrypted = packetPool.allocCopy(*p);
+        DEBUG_HEAP_AFTER("Router::publishReceivedToMqtt", pEncrypted);
+        if (pEncrypted == nullptr) {
+            LOG_WARN("pEncrypted null, skip MQTT publish");
+            return;
+        }
+        stampRxTime(pEncrypted);
+    }
+
+    // On the dupe-filter path the packet is still encrypted (routing filters run before the in-place decode),
+    // so decode a copy. Only packets that decode successfully are published; PKI DMs we can't decrypt are
+    // handled by perhapsUplinkOpaquePki().
+    const meshtastic_MeshPacket *decodedPacket = p;
+    meshtastic_MeshPacket *decodedCopy = nullptr;
+    if (p->which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
+        decodedState = DecodeState::DECODE_SUCCESS;
+    } else if (!callerProvided) {
+        decodedCopy = packetPool.allocCopy(*p);
+        if (decodedCopy == nullptr) {
+            LOG_WARN("Alloc packet copy for MQTT decode failed");
+            packetPool.release(pEncrypted);
+            return;
+        }
+        decodedState = perhapsDecode(decodedCopy);
+        decodedCopy->rx_time = pEncrypted->rx_time;
+        decodedCopy->has_rx_time = pEncrypted->has_rx_time;
+        decodedPacket = decodedCopy;
+    }
+
+    if (decodedState == DecodeState::DECODE_SUCCESS) {
+        // Traceroutes are changed by us after decoding, and a copy that was already decoded has no ciphertext:
+        // encrypt a fresh copy from the current packet state in both cases.
+        if (moduleConfig.mqtt.encryption_enabled && (decodedPacket->decoded.portnum == meshtastic_PortNum_TRACEROUTE_APP ||
+                                                     pEncrypted->which_payload_variant != meshtastic_MeshPacket_encrypted_tag)) {
+            // Only release the original after successful allocation to avoid losing an incomplete but valid packet
+            auto *pEncryptedNew = packetPool.allocCopy(*decodedPacket);
+            if (pEncryptedNew && perhapsEncode(pEncryptedNew) == meshtastic_Routing_Error_NONE) {
+                packetPool.release(pEncrypted);
+                pEncrypted = pEncryptedNew;
+            } else {
+                packetPool.release(pEncryptedNew);
+                if (pEncrypted->which_payload_variant != meshtastic_MeshPacket_encrypted_tag) {
+                    LOG_WARN("Encrypt packet for MQTT failed, skip publish");
+                    packetPool.release(decodedCopy);
+                    packetPool.release(pEncrypted);
+                    return;
+                }
+                LOG_WARN("New TR packet encrypt failed, send original TR to MQTT");
+            }
+        }
+        mqtt->onSend(*pEncrypted, *decodedPacket, decodedPacket->channel);
+    }
+
+    packetPool.release(decodedCopy);
+    packetPool.release(pEncrypted);
 }
+#endif
 
 void Router::perhapsUplinkOpaquePki(meshtastic_MeshPacket *p)
 {
@@ -1730,12 +1776,14 @@ void Router::perhapsUplinkOpaquePki(meshtastic_MeshPacket *p)
         p->id == 0 || isBroadcast(p->to) || isToUs(p) || isFromUs(p))
         return;
 
+#if !USERPREFS_MQTT_UPLINK_ALL_SEEN
     for (const auto &seen : opaqueUplinkSeen) {
         if (seen.from == p->from && seen.id == p->id)
             return;
     }
     opaqueUplinkSeen[opaqueUplinkNext] = {p->from, p->id};
     opaqueUplinkNext = (opaqueUplinkNext + 1) % opaqueUplinkCapacity;
+#endif
 
     p->pki_encrypted = true;
     stampRxTime(p);

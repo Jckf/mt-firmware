@@ -11,6 +11,8 @@
 #include "concurrency/OSThread.h"
 #include <memory>
 
+enum DecodeState : int;
+
 inline bool isCoordinatePortnum(meshtastic_PortNum portnum)
 {
     return portnum == meshtastic_PortNum_POSITION_APP || portnum == meshtastic_PortNum_WAYPOINT_APP ||
@@ -212,6 +214,15 @@ class Router : protected concurrency::OSThread, protected PacketHistory
     void sendAckNak(meshtastic_Routing_Error err, NodeNum to, PacketId idFrom, ChannelIndex chIndex, uint8_t hopLimit = 0,
                     bool ackWantsAck = false, const meshtastic_MeshPacket *relaySource = nullptr);
 
+#if !MESHTASTIC_EXCLUDE_MQTT
+    /**
+     * Publish a received packet to MQTT using the same receive-side publish rules as dispatchReceived().
+     * Takes ownership of pEncrypted when provided (and always releases it before returning).
+     */
+    void publishReceivedToMqtt(const meshtastic_MeshPacket *p, DecodeState decodedState,
+                               meshtastic_MeshPacket *pEncrypted = nullptr);
+#endif
+
   private:
     /**
      * Called from loop()
@@ -309,7 +320,7 @@ class Router : protected concurrency::OSThread, protected PacketHistory
 #endif
 };
 
-enum DecodeState { DECODE_SUCCESS, DECODE_FAILURE, DECODE_OPAQUE, DECODE_FATAL, DECODE_POLICY_REJECT };
+enum DecodeState : int { DECODE_SUCCESS, DECODE_FAILURE, DECODE_OPAQUE, DECODE_FATAL, DECODE_POLICY_REJECT };
 enum class RoutingAuthVerdict { ACCEPT, OPAQUE_RELAY_ONLY, REJECT };
 
 /** FIXME - move this into a mesh packet class

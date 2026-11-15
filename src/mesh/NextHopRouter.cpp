@@ -140,6 +140,9 @@ bool NextHopRouter::shouldFilterReceived(const meshtastic_MeshPacket *p)
 
     // Handle hop_limit upgrade scenario for rebroadcasters
     if (wasUpgraded && perhapsHandleUpgradedPacket(p)) {
+#if USERPREFS_MQTT_UPLINK_ALL_SEEN && !MESHTASTIC_EXCLUDE_MQTT
+        publishReceivedToMqtt(p, DecodeState::DECODE_FAILURE);
+#endif
         return true; // we handled it, so stop processing
     }
 
@@ -174,6 +177,9 @@ bool NextHopRouter::shouldFilterReceived(const meshtastic_MeshPacket *p)
                 perhapsCancelDupe(p); // If it's a dupe, cancel relay if we were not explicitly asked to relay
             }
         }
+#if USERPREFS_MQTT_UPLINK_ALL_SEEN && !MESHTASTIC_EXCLUDE_MQTT
+        publishReceivedToMqtt(p, DecodeState::DECODE_FAILURE);
+#endif
         return true;
     }
 
