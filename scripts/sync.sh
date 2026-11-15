@@ -3,7 +3,8 @@
 #
 # Rebases every patch branch in builds.json onto upstream and force-pushes the ones that moved.
 # The fork's own develop is never pushed: that would start upstream's full CI matrix in the fork. Writes to $GITHUB_OUTPUT:
-#   builds   - matrix entries {branch, suffix, sha, platform, pio_env} for branches to build
+#   builds   - matrix entries {branch, suffix, sha, platform, pio_env, arch, name} for branches to build;
+#              name is the pio_env, or meshtasticd-<arch> for portduino targets
 #   releases - one entry per branch to build {branch, suffix, description, sha, short, upstream, count}
 #   failed - patch branches that no longer rebase cleanly
 #
@@ -61,7 +62,8 @@ while read -r entry <&3; do
     # Same abbreviation as bin/readprops.py, so the release job can find the artifacts by version.
     short=$(git rev-parse --short=7 HEAD)
     builds=$(jq -c --argjson e "$entry" --arg sha "$sha" \
-      '. + [$e.targets[] | {branch: $e.branch, suffix: $e.suffix, sha: $sha, platform, pio_env}]' <<<"$builds")
+      '. + [$e.targets[] | {branch: $e.branch, suffix: $e.suffix, sha: $sha, platform, pio_env, arch: (.arch // ""),
+        name: (if .arch then "meshtasticd-\(.arch)" else .pio_env end)}]' <<<"$builds")
     releases=$(jq -c --argjson e "$entry" --arg sha "$sha" --arg short "$short" --arg up "$upstream_sha" \
       '. + [{branch: $e.branch, suffix: $e.suffix, description: ($e.description // ""), sha: $sha, short: $short, upstream: $up, count: ($e.targets | length)}]' <<<"$releases")
   fi

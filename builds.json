@@ -16,5 +16,15 @@
       { "platform": "nrf52840", "pio_env": "heltec-mesh-tower-v2" },
       { "platform": "esp32s3", "pio_env": "meshnology_w12" }
     ]
+  },
+  {
+    "branch": "jckf/mqtt-duplicates",
+    "suffix": "jmd",
+    "description": "MQTT uplink of every heard copy of a packet, not just the first (meshtastic/firmware#10531)",
+    "targets": [
+      { "platform": "portduino", "pio_env": "native-tft", "arch": "amd64" },
+      { "platform": "portduino", "pio_env": "native-tft", "arch": "arm64" },
+      { "platform": "portduino", "pio_env": "native-tft", "arch": "armv7" }
+    ]
   }
 ]

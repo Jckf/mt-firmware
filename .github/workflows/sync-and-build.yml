@@ -70,8 +70,10 @@ jobs:
   build:
     needs: sync
     if: ${{ !cancelled() && needs.sync.outputs.builds != '' && needs.sync.outputs.builds != '[]' }}
-    name: ${{ matrix.branch }} ${{ matrix.pio_env }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.branch }} ${{ matrix.name }}
+    # arm64 meshtasticd builds natively on an arm runner; armv7 has no runner and builds under QEMU.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
@@ -89,10 +91,46 @@ jobs:
         run: echo "long=$(./bin/buildinfo.py long)-$SUFFIX" >> "$GITHUB_OUTPUT"
 
       - uses: meshtastic/gh-action-firmware@main
+        if: matrix.platform != 'portduino'
         with:
           pio_platform: ${{ matrix.platform }}
           pio_env: ${{ matrix.pio_env }}
           pio_target: build
+
+      # meshtasticd: the same Debian trixie toolchain and libraries as upstream's Dockerfile builder, so the
+      # binary drops in over the meshtasticd package on Debian / Raspberry Pi OS trixie.
+      - name: Portduino - Set up QEMU
+        if: matrix.platform == 'portduino' && matrix.arch == 'armv7'
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm
+
+      - name: Portduino - Build meshtasticd
+        if: matrix.platform == 'portduino'
+        env:
+          ARCH: ${{ matrix.arch }}
+          PIO_ENV: ${{ matrix.pio_env }}
+        run: |
+          case "$ARCH" in
+            amd64) plat=linux/amd64 ;;
+            arm64) plat=linux/arm64 ;;
+            armv7) plat=linux/arm/v7 ;;
+            *) echo "::error::unknown arch $ARCH"; exit 1 ;;
+          esac
+          docker run --rm --platform "$plat" -v "$PWD:/fw" -w /fw -e PIO_ENV -e DEBIAN_FRONTEND=noninteractive \
+            -e PIP_BREAK_SYSTEM_PACKAGES=1 -e PIP_ROOT_USER_ACTION=ignore debian:trixie bash -euxc '
+              apt-get update
+              apt-get install --no-install-recommends -y \
+                curl wget g++ zip git ca-certificates pkg-config \
+                python3-pip python3-grpc-tools \
+                libgpiod-dev libyaml-cpp-dev libjsoncpp-dev libbluetooth-dev libsdbus-c++-dev libi2c-dev libuv1-dev \
+                libcurl4-gnutls-dev libusb-1.0-0-dev libulfius-dev liborcania-dev libssl-dev libavahi-client-dev \
+                libx11-dev libinput-dev libxkbcommon-x11-dev libsqlite3-dev libsdl2-dev libnotify-dev
+              pip install --no-cache-dir -U platformio
+              git config --global --add safe.directory /fw
+              pio run -e "$PIO_ENV"
+              mkdir -p release
+              install -m 755 ".pio/build/$PIO_ENV/meshtasticd" release/meshtasticd'
 
       # ESP32 steps below follow upstream's build_firmware.yml so the release folder flashes the same way.
       - name: ESP32 - Download unified OTA firmware
@@ -126,7 +164,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: firmware-${{ matrix.pio_env }}-${{ steps.version.outputs.long }}
+          name: firmware-${{ matrix.name }}-${{ steps.version.outputs.long }}
           overwrite: true
           path: |
             release/*.mt.json
@@ -137,6 +175,7 @@ jobs:
             release/*.zip
             release/device-*.sh
             release/device-*.bat
+            release/meshtasticd
 
   # One rolling release per patch branch, tag <suffix>-latest, with stable asset names so the
   # download links never change. Published only when every target of the branch built.
@@ -187,18 +226,24 @@ jobs:
           for d in "${dirs[@]}"; do
             name=${d#dist/}
             [[ $name =~ ^firmware-(.+)-([0-9]+\.[0-9]+\.[0-9]+\.$SHORT-$SUFFIX)$ ]] || { echo "::error::unexpected artifact $name"; exit 1; }
-            pio_env=${BASH_REMATCH[1]}
+            target=${BASH_REMATCH[1]}
             version=${BASH_REMATCH[2]}
-            zip_name="firmware-$pio_env-$SUFFIX.zip"
-            (cd "$d" && zip -qr "../../out/$zip_name" .)
-            rows+="| \`$pio_env\` | [$zip_name]($REPO_URL/releases/download/$TAG/$zip_name) |"$'\n'
+            if [[ -f "$d/meshtasticd" ]]; then
+              # meshtasticd ships as the bare binary, e.g. meshtasticd-arm64-jmd.
+              asset="$target-$SUFFIX"
+              cp "$d/meshtasticd" "out/$asset"
+            else
+              asset="firmware-$target-$SUFFIX.zip"
+              (cd "$d" && zip -qr "../../out/$asset" .)
+            fi
+            rows+="| \`$target\` | [$asset]($REPO_URL/releases/download/$TAG/$asset) |"$'\n'
           done
 
           {
             echo "**$version**, built from [\`$SHORT\`]($REPO_URL/commit/$SHA) on [\`$BRANCH\`]($REPO_URL/tree/$BRANCH), on top of upstream [\`${UPSTREAM:0:7}\`](https://github.com/meshtastic/firmware/commit/$UPSTREAM)."
             echo
             [[ -n "$DESCRIPTION" ]] && { echo "$DESCRIPTION"; echo; }
-            echo "| Board | Download |"
+            echo "| Target | Download |"
             echo "| --- | --- |"
             printf '%s' "$rows"
             echo
@@ -215,12 +260,12 @@ jobs:
           title="$BRANCH (latest)"
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --title "$title" --notes-file notes.md
-            gh release upload "$TAG" -R "$GITHUB_REPOSITORY" out/*.zip --clobber
+            gh release upload "$TAG" -R "$GITHUB_REPOSITORY" out/* --clobber
             # Drop boards that were removed from builds.json.
             gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | while read -r asset; do
               [[ -f "out/$asset" ]] || gh release delete-asset "$TAG" "$asset" -R "$GITHUB_REPOSITORY" -y
             done
           else
-            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag --latest=false --title "$title" --notes-file notes.md out/*.zip
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag --latest=false --title "$title" --notes-file notes.md out/*
           fi
           echo "Published $REPO_URL/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
