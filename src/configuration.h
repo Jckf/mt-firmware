@@ -107,6 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MESHTASTIC_ENABLE_FRAME_INJECTION 0
 #endif
 
+// When enabled, uplink every seen packet copy to MQTT, including duplicates.
+#ifndef USERPREFS_MQTT_UPLINK_ALL_SEEN
+#define USERPREFS_MQTT_UPLINK_ALL_SEEN 0
+#endif
+
 /// Convert a preprocessor name into a quoted string
 #define xstr(s) ystr(s)
 #define ystr(s) #s
