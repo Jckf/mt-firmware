@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Unofficial build.** This is the `jckf/powerlimit` branch of [Jckf/mt-firmware](https://github.com/Jckf/mt-firmware), a small patch set on top of [meshtastic/firmware](https://github.com/meshtastic/firmware). It is not made or supported by the Meshtastic project; report problems [here](https://github.com/Jckf/mt-firmware/issues), not upstream. See the [custom builds README](https://github.com/Jckf/mt-firmware/blob/jckf/main/README.md) for what this branch changes and where to download it. Everything below is upstream's README.
+
 <div align="center" markdown="1">
 
 <img src=".github/meshtastic_logo.png" alt="Meshtastic Logo" width="80"/>
