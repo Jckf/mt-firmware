@@ -10,7 +10,10 @@
       { "platform": "esp32s3", "pio_env": "heltec-v4" },
       { "platform": "esp32s3", "pio_env": "heltec-v4-tft" },
       { "platform": "esp32s3", "pio_env": "heltec-v4-r8-oled" },
-      { "platform": "esp32s3", "pio_env": "heltec-v4-r8-tft" }
+      { "platform": "esp32s3", "pio_env": "heltec-v4-r8-tft" },
+      { "platform": "nrf52840", "pio_env": "heltec-mesh-node-t096" },
+      { "platform": "esp32s3", "pio_env": "heltec-wireless-tracker-v2" },
+      { "platform": "nrf52840", "pio_env": "heltec-mesh-tower-v2" }
     ]
   }
 ]
