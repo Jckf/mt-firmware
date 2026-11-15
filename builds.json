@@ -24,7 +24,14 @@
     "targets": [
       { "platform": "portduino", "pio_env": "native-tft", "arch": "amd64" },
       { "platform": "portduino", "pio_env": "native-tft", "arch": "arm64" },
-      { "platform": "portduino", "pio_env": "native-tft", "arch": "armv7" }
+      { "platform": "portduino", "pio_env": "native-tft", "arch": "armv7" },
+      { "platform": "esp32s3", "pio_env": "t-beam-1w" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4-tft" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4-r8-oled" },
+      { "platform": "esp32s3", "pio_env": "heltec-v4-r8-tft" },
+      { "platform": "esp32s3", "pio_env": "heltec-wireless-tracker-v2" },
+      { "platform": "esp32s3", "pio_env": "meshnology_w12" }
     ]
   }
 ]

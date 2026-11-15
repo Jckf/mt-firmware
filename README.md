@@ -9,7 +9,7 @@ Not supported by the Meshtastic project. Report problems here, not upstream.
 | Branch | Version suffix | Change | Boards |
 | --- | --- | --- | --- |
 | [`jckf/powerlimit`](../../tree/jckf/powerlimit) | `-jpl` | `EU_868`, `EU_866` and `EU_N_868` power limit raised from 27 to 30 dBm | T-Beam 1W, RAK3401 + RAK13302, WisMesh Repeater Mini HP, Heltec V4, V4 R8, Mesh Node T096, Wireless Tracker V2, Mesh Tower V2, Meshnology W12 |
-| [`jckf/mqtt-duplicates`](../../tree/jckf/mqtt-duplicates) | `-jmd` | MQTT uplink of every heard copy of a packet, not just the first | meshtasticd (Linux amd64, arm64, armv7) |
+| [`jckf/mqtt-duplicates`](../../tree/jckf/mqtt-duplicates) | `-jmd` | MQTT uplink of every heard copy of a packet, not just the first | meshtasticd (Linux amd64, arm64, armv7), T-Beam 1W, Heltec V4, V4 R8, Wireless Tracker V2, Meshnology W12 |
 
 ### `jckf/powerlimit`
 
@@ -27,7 +27,7 @@ EU short-range-device limits are specified as ERP (27 dBm). The firmware applies
 
 A port of [meshtastic/firmware#10531](https://github.com/meshtastic/firmware/pull/10531) onto current `develop`, with `USERPREFS_MQTT_UPLINK_ALL_SEEN` turned on. Stock firmware uplinks a packet to MQTT only the first time it is heard; this build also uplinks every later copy (rebroadcasts by other relays, including of our own packets), so MQTT analytics see the SNR of every relay heard and traceroute paths that only arrive on a later copy. With MQTT encryption enabled, encrypted DMs between other nodes are uplinked once per heard copy as well.
 
-Only useful on a node with MQTT uplink enabled, and it multiplies the MQTT traffic. Built as `meshtasticd` (the `native-tft` environment, like the Debian packages) against Debian trixie, so it replaces `/usr/bin/meshtasticd` from the meshtasticd package on Debian or Raspberry Pi OS trixie. To install it and keep it updated:
+Only useful on a node with MQTT uplink enabled, and it multiplies the MQTT traffic. Built for the ESP32-S3 boards listed above, which uplink over WiFi and flash like any other release, and as `meshtasticd`. The meshtasticd binary is the `native-tft` environment (like the Debian packages) built against Debian trixie, so it replaces `/usr/bin/meshtasticd` from the meshtasticd package on Debian or Raspberry Pi OS trixie. To install it and keep it updated:
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/Jckf/mt-firmware/refs/heads/jckf/main/scripts/meshtasticd-custom.sh
