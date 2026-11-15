@@ -8,8 +8,8 @@ Not supported by the Meshtastic project. Report problems here, not upstream.
 
 | Branch | Version suffix | Change | Boards |
 | --- | --- | --- | --- |
-| [`jckf/powerlimit`](../../tree/jckf/powerlimit) | `-jpl` | `EU_868`, `EU_866` and `EU_N_868` power limit raised from 27 to 30 dBm | T-Beam 1W, RAK3401 + RAK13302, WisMesh Repeater Mini HP, Heltec V4, V4 R8, Mesh Node T096, Wireless Tracker V2, Mesh Tower V2, Meshnology W12 |
-| [`jckf/mqtt-duplicates`](../../tree/jckf/mqtt-duplicates) | `-jmd` | MQTT uplink of every heard copy of a packet, not just the first | meshtasticd (Linux amd64, arm64, armv7), T-Beam 1W, Heltec V4, V4 R8, Wireless Tracker V2, Meshnology W12 |
+| [`jckf/powerlimit`](https://github.com/Jckf/mt-firmware/tree/jckf/powerlimit) | `-jpl` | `EU_868`, `EU_866` and `EU_N_868` power limit raised from 27 to 30 dBm | T-Beam 1W, RAK3401 + RAK13302, WisMesh Repeater Mini HP, Heltec V4, V4 R8, Mesh Node T096, Wireless Tracker V2, Mesh Tower V2, Meshnology W12 |
+| [`jckf/mqtt-duplicates`](https://github.com/Jckf/mt-firmware/tree/jckf/mqtt-duplicates) | `-jmd` | MQTT uplink of every heard copy of a packet, not just the first | meshtasticd (Linux amd64, arm64, armv7), T-Beam 1W, Heltec V4, V4 R8, Wireless Tracker V2, Meshnology W12 |
 
 ### `jckf/powerlimit`
 
@@ -42,8 +42,8 @@ Each patch set has a release that every new build replaces. The links below neve
 
 | Branch | Release |
 | --- | --- |
-| `jckf/powerlimit` | [jpl-latest](../../releases/tag/jpl-latest) |
-| `jckf/mqtt-duplicates` | [jmd-latest](../../releases/tag/jmd-latest) |
+| `jckf/powerlimit` | [jpl-latest](https://github.com/Jckf/mt-firmware/releases/tag/jpl-latest) |
+| `jckf/mqtt-duplicates` | [jmd-latest](https://github.com/Jckf/mt-firmware/releases/tag/jmd-latest) |
 
 Direct links per board follow the pattern `https://github.com/Jckf/mt-firmware/releases/download/<suffix>-latest/firmware-<pio_env>-<suffix>.zip`, e.g. [firmware-t-beam-1w-jpl.zip](https://github.com/Jckf/mt-firmware/releases/download/jpl-latest/firmware-t-beam-1w-jpl.zip). Flash it like any other Meshtastic release. meshtasticd builds are the bare binary: `https://github.com/Jckf/mt-firmware/releases/download/<suffix>-latest/meshtasticd-<arch>-<suffix>`. The firmware reports the upstream version with the patch branch's commit hash, e.g. `2.8.3.949efa6`, and `firmware_edition` `DIY_EDITION`.
 
@@ -65,6 +65,6 @@ Direct links per board follow the pattern `https://github.com/Jckf/mt-firmware/r
 2. Add an entry to `builds.json`: branch, version suffix, description and `{platform, pio_env}` targets. For meshtasticd use `{"platform": "portduino", "pio_env": "native-tft", "arch": "amd64" | "arm64" | "armv7"}`; armv7 builds under QEMU and takes a few hours.
 3. Push `builds.json`. That triggers a full build and creates the `<suffix>-latest` release; after that the branch is rebased and rebuilt whenever upstream moves.
 
-After pushing new commits to a patch branch, run [Sync and build](../../actions/workflows/sync-and-build.yml) by hand with that branch and *Build even if upstream has not moved* ticked. The nightly run only builds branches that upstream moved.
+After pushing new commits to a patch branch, run [Sync and build](https://github.com/Jckf/mt-firmware/actions/workflows/sync-and-build.yml) by hand with that branch and *Build even if upstream has not moved* ticked. The nightly run only builds branches that upstream moved.
 
 If a patch set stops rebasing cleanly, the run fails (and opens an issue if issues are enabled). Rebase the branch by hand and push it.
